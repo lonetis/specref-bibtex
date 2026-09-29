@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Specref BibTeX</title>
+  <meta name="description" content="Every Specref reference (W3C, WHATWG, IETF, ISO, ETSI, WG21 and more) as a single BibTeX file, refreshed daily.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a5fb4'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3E%7B%7D%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Specref BibTeX</h1>
+    <p>
+      Every reference from <a href="https://www.specref.org/">Specref</a> (W3C, WHATWG, IETF, ISO, ETSI, WG21 and more)
+      as a single BibTeX file, refreshed daily.
+    </p>
+  </header>
+
+  <main>
+    <section class="file" aria-label="BibTeX file">
+      <dl class="stats">
+        <div><dt>Entries</dt><dd id="entry-count">…</dd></div>
+        <div><dt>Size</dt><dd id="file-size">…</dd></div>
+        <div><dt>Updated</dt><dd><time id="generated-at">…</time></dd></div>
+      </dl>
+      <div class="actions">
+        <a class="button primary" href="specref.bib" download="specref.bib">Download specref.bib</a>
+        <button type="button" class="button" id="copy-all" disabled>Copy all</button>
+      </div>
+      <p class="hint">
+        UTF-8 encoded. Titles are brace-protected and URLs go in the <code>url</code> field.
+        With biblatex, Specref aliases (e.g. <code>HTTP11</code>) resolve through the <code>ids</code> field.
+      </p>
+    </section>
+
+    <section class="search" aria-labelledby="search-heading">
+      <h2 id="search-heading">Find an entry</h2>
+      <input type="search" id="search" placeholder="Key, alias, title, author, URL…" aria-describedby="status"
+             autocomplete="off" autocapitalize="off" spellcheck="false" disabled>
+      <p id="status" role="status">Loading the latest BibTeX file…</p>
+      <ol id="results" class="results"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Reference data from <a href="https://www.specref.org/">Specref</a>
+      (<a href="https://github.com/specinfra/specref">specinfra/specref</a>), a community-maintained database
+      dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0 1.0</a>.
+      Spotted a wrong reference? <a href="https://github.com/specinfra/specref/blob/main/CONTRIBUTING.md">Fix it upstream in Specref</a>.
+    </p>
+    <p>
+      Not affiliated with Specref.
+      <a href="https://github.com/lonetis/specref-bibtex">Source code</a> under the Apache License 2.0.
+    </p>
+  </footer>
+
+  <template id="entry-template">
+    <li class="entry">
+      <div class="entry-head">
+        <code class="entry-key"></code>
+        <button type="button" class="button small copy">Copy</button>
+      </div>
+      <pre class="entry-text"></pre>
+    </li>
+  </template>
+</body>
+</html>
