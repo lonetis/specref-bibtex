@@ -1,0 +1,16 @@
+specref-bibtex
+Copyright 2026 Louis Jannett
+
+This project is built on Specref (https://www.specref.org/,
+https://github.com/specinfra/specref). It is not affiliated with Specref.
+
+Bibliographic data
+  The generated BibTeX file is converted from the Specref reference
+  database, which is dedicated to the public domain under CC0 1.0 Universal
+  (https://creativecommons.org/publicdomain/zero/1.0/).
+
+Code
+  The W3C status labels in src/bibtex.ts are adapted from docs/js/search.js
+  in Specref, Copyright 2016 Tobie Langel, licensed under the Apache License,
+  Version 2.0 (see LICENSE). They were extended with newer W3C maturity
+  levels.
