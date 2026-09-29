@@ -36,7 +36,8 @@ test/             Unit tests
 - Author names containing a comma, a standalone `and`, or a `Jr./Sr.` suffix are brace-protected (printed verbatim); plain "First Last" names stay parseable.
 - Text fields: whitespace collapsed, a small set of HTML entities decoded, LaTeX specials escaped. Braces become `\textbraceleft{}`/`\textbraceright{}` because BibTeX counts braces even when escaped. URLs are left raw except `{`, `}`, and whitespace.
 - The `.bib` starts with `%` comment lines (source, timestamp, attribution). Never put `@` in them: BibTeX would start parsing an entry.
-- Output was validated by compiling every entry with biblatex/biber + LuaLaTeX and a sample with BibTeX + plainnat.
+- Validation done so far (TeX Live 2026 in Docker): biber parses all entries (only warnings: an upstream ISBN typo in `IEEE-754*`); every entry containing a LaTeX escape plus a random sample compiles with biblatex/biber + LuaLaTeX, and the ASCII ones with BibTeX `plain` + pdfLaTeX. Typesetting all 70k entries in one document is impractical (biblatex takes hours).
+- Known limitation: author-year `.bst` styles like `plainnat` break when more than 26 *cited* entries share a label (e.g. author-less ETSI specs from one year): `natexlab` suffixes run past `z`. That's the style's limit; don't add a `key` field to work around it without a better label source.
 
 ## Page (`site/`)
 
