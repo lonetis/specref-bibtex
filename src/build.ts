@@ -24,12 +24,18 @@ async function main(): Promise<void> {
 
   console.log(`Fetching ${source}`);
   const dump = await fetchDump(source);
-  const { entries, skipped } = convert(dump);
+  const { entries, skipped, dropped } = convert(dump);
   if (entries.length === 0) {
     throw new Error(`No references found in ${source}`);
   }
   if (skipped.length > 0) {
     console.warn(`Skipped ${skipped.length} entries with ids that are not valid BibTeX keys: ${skipped.join(", ")}`);
+  }
+  if (dropped.size > 0) {
+    const list = [...dropped]
+      .sort(([, a], [, b]) => b - a)
+      .map(([char, count]) => `${codePoint(char)} ${char} (${count})`);
+    console.warn(`Dropped ${list.length} distinct characters without a LaTeX equivalent: ${list.join(", ")}`);
   }
 
   const generatedAt = new Date().toISOString();
@@ -52,6 +58,10 @@ async function main(): Promise<void> {
   await writeFile(`${OUTPUT_DIR}/meta.json`, `${JSON.stringify(meta, null, 2)}\n`);
 
   console.log(`Wrote ${entries.length} entries to ${OUTPUT_DIR}/${BIBTEX_FILE}`);
+}
+
+function codePoint(char: string): string {
+  return `U+${char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
 await main();

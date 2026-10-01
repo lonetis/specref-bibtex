@@ -8,6 +8,7 @@ Every reference in [Specref](https://www.specref.org/) (W3C, WHATWG, IETF, ISO, 
 - Citation keys match Specref ids, so `[[rfc7230]]` in ReSpec becomes `\cite{rfc7230}` in LaTeX
 - Specref aliases (e.g. `HTTP11`) resolve to their entry in biblatex through the `ids` field
 - Works with biblatex/biber and classic BibTeX: titles keep their capitalization, LaTeX special characters are escaped, URLs go in the `url` field
+- UTF-8 that compiles as-is with pdfLaTeX, LuaLaTeX and XeLaTeX, without extra packages or `\DeclareUnicodeCharacter`: names keep their accents (`Tomasz Kamiński`)
 - GitHub Pages site with the latest file for download, copy all, and search to copy single entries
 - Rebuilt every day from the latest Specref data by GitHub Actions
 
@@ -43,7 +44,9 @@ Download [`specref.bib`](https://lonetis.github.io/specref-bibtex/specref.bib) o
 curl -sSfLO https://lonetis.github.io/specref-bibtex/specref.bib
 ```
 
-The file is UTF-8. biblatex with biber is recommended; with pdfLaTeX and classic BibTeX, entries with characters outside your font encoding (e.g. CJK titles) may need extra packages.
+The file is UTF-8 and only contains characters that both pdfLaTeX and LuaLaTeX can typeset out of the box. A few are written as LaTeX commands instead: symbols like `{\ensuremath{\neq}}`, and accented letters that start a word in an author name (`{\"{U}}mit Yalçinalp`), so classic BibTeX can still abbreviate them. Invisible characters from the source data are removed. Text that LaTeX can't typeset without extra packages, such as CJK parts of titles or emoji, is left out, and characters that are already garbled in Specref show up as `?`.
+
+biblatex with biber is recommended. With classic BibTeX, styles that build labels from the first letters of names (`alpha`, `amsalpha`) break on accented names; use biblatex's `alphabetic` style instead. With pdfLaTeX, load `\usepackage[T1]{fontenc}` as usual so `<`, `>` and `|` in titles print correctly.
 
 Found a wrong or missing reference? Fix it upstream in [Specref](https://github.com/specinfra/specref/blob/main/CONTRIBUTING.md); the change shows up here within a day.
 

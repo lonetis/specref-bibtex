@@ -1,3 +1,4 @@
+import { escapeLatex, escapeName, type DropHandler } from "./latex.ts";
 import { collectAliases, isAlias, type SpecrefDump, type SpecrefEntry } from "./specref.ts";
 
 // Adapted from REF_STATUSES in Specref's docs/js/search.js
@@ -25,34 +26,9 @@ const MONTHS = [
   "july", "august", "september", "october", "november", "december",
 ];
 
-const LATEX_ESCAPES: Record<string, string> = {
-  "\\": "\\textbackslash{}",
-  // BibTeX counts braces even when escaped, so `\{` could unbalance a field.
-  "{": "\\textbraceleft{}",
-  "}": "\\textbraceright{}",
-  "&": "\\&",
-  "%": "\\%",
-  $: "\\$",
-  "#": "\\#",
-  _: "\\_",
-  "^": "\\textasciicircum{}",
-  "~": "\\textasciitilde{}",
-};
-
-// A few Specref fields contain HTML entities.
-const HTML_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  ndash: "–",
-  mdash: "—",
-};
-
-// Characters BibTeX and biber cannot handle in a citation key.
-const VALID_KEY = /^[^\s,{}()=#%"'\\~]+$/;
+// Printable ASCII (a non-ASCII key breaks \cite under pdfLaTeX) without the
+// characters BibTeX and biber cannot handle in a citation key.
+const VALID_KEY = /^(?:(?![,{}()=#%"'\\~])[!-~])+$/;
 
 // BibTeX splits names on " and " and reads commas as "Last, First". Specref
 // names are free-form ("R. Fielding, Ed.", "IAB and IESG", "Tab Atkins Jr."),
@@ -71,6 +47,8 @@ export interface Conversion {
   entries: string[];
   // Ids of Specref entries that are not usable as BibTeX keys.
   skipped: string[];
+  // Characters without a LaTeX equivalent that were left out, with counts.
+  dropped: Map<string, number>;
 }
 
 export interface HeaderInfo {
@@ -89,27 +67,36 @@ export function convert(dump: SpecrefDump): Conversion {
     else skipped.push(ref.id);
   }
   valid.sort((a, b) => keyCollator.compare(a.id, b.id));
+  const dropped = new Map<string, number>();
+  const countDropped: DropHandler = (char) => dropped.set(char, (dropped.get(char) ?? 0) + 1);
   return {
-    entries: valid.map((entry) => formatEntry(entry, aliases.get(entry.id))),
+    entries: valid.map((entry) => formatEntry(entry, aliases.get(entry.id), countDropped)),
     skipped,
+    dropped,
   };
 }
 
-export function formatEntry(entry: SpecrefEntry, aliases: readonly string[] = []): string {
+export function formatEntry(
+  entry: SpecrefEntry,
+  aliases: readonly string[] = [],
+  onDropped?: DropHandler,
+): string {
+  const text = (value: string | undefined) => value && escapeLatex(value, onDropped);
   const { year, month }: BibtexDate = entry.date ? parseDate(entry.date) : {};
   const status = entry.status && (STATUS_LABELS[entry.status] ?? entry.status);
+  const title = text(entry.title);
   const ids = aliases.filter((alias) => VALID_KEY.test(alias));
   const fields: Array<[name: string, value: string | undefined]> = [
-    ["author", braced(formatAuthors(entry))],
+    ["author", braced(formatAuthors(entry, onDropped))],
     // Double braces keep the capitalization of acronyms like HTTP or CSS.
-    ["title", braced(entry.title && `{${escapeLatex(entry.title)}}`)],
-    ["howpublished", braced(entry.publisher && escapeLatex(entry.publisher))],
-    ["note", braced(status && escapeLatex(status))],
+    ["title", braced(title && `{${title}}`)],
+    ["howpublished", braced(text(entry.publisher))],
+    ["note", braced(text(status))],
     ["year", braced(year)],
     // Month macros (jan, feb, ...) must stay unbraced.
     ["month", month],
-    ["isbn", braced(entry.isbn && escapeLatex(entry.isbn))],
-    ["pages", braced(entry.pages && escapeLatex(entry.pages))],
+    ["isbn", braced(text(entry.isbn))],
+    ["pages", braced(text(entry.pages))],
     ["url", braced(entry.href && formatUrl(entry.href))],
     // biblatex resolves citations of these keys to this entry.
     ["ids", braced(ids.length > 0 ? ids.join(", ") : undefined)],
@@ -131,13 +118,6 @@ export function parseDate(date: string): BibtexDate {
   return { year, month: monthName === undefined ? undefined : monthMacro(MONTHS.indexOf(monthName)) };
 }
 
-export function escapeLatex(text: string): string {
-  return decodeHtmlEntities(text)
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[\\{}&%$#_^~]/g, (char) => LATEX_ESCAPES[char] ?? char);
-}
-
 export function renderHeader({ source, generatedAt, entryCount }: HeaderInfo): string {
   return [
     "Specref BibTeX export",
@@ -153,9 +133,9 @@ export function renderHeader({ source, generatedAt, entryCount }: HeaderInfo): s
     .join("\n");
 }
 
-function formatAuthors(entry: SpecrefEntry): string | undefined {
+function formatAuthors(entry: SpecrefEntry, onDropped?: DropHandler): string | undefined {
   const names = (entry.authors ?? [])
-    .map(escapeLatex)
+    .map((name) => escapeName(name, onDropped))
     // Some names carry a leftover list separator ("and Jörg Schwenk"), which
     // would produce an empty name between two `and`s.
     .map((name) => name.replace(/^and\b\s*|\s*\band$/gi, ""))
@@ -167,17 +147,9 @@ function formatAuthors(entry: SpecrefEntry): string | undefined {
 }
 
 // URLs are verbatim in biblatex, so only characters that would break the
-// BibTeX syntax itself are encoded.
+// BibTeX syntax and anything outside printable ASCII are percent-encoded.
 function formatUrl(href: string): string {
-  return href.trim().replace(/[{}\s]/g, encodeURIComponent);
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (entity, decimal, hex, name) => {
-    const codePoint = decimal ? Number(decimal) : hex ? parseInt(hex, 16) : undefined;
-    if (codePoint === undefined) return HTML_ENTITIES[name.toLowerCase()] ?? entity;
-    return codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : entity;
-  });
+  return href.trim().replace(/[^!-~]|[{}]/gu, encodeURIComponent);
 }
 
 function monthMacro(index: number): string | undefined {

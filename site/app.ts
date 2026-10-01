@@ -24,6 +24,15 @@ const COPY_FEEDBACK_MS = 1500;
 
 const numberFormat = new Intl.NumberFormat("en");
 
+// Letters the build writes as commands ({\"{U}}, {\c{C}}, {\L}): group 1 is a
+// letter command, group 2 a base letter. Symbols like {\ensuremath{\neq}}
+// don't match.
+const LATEX_LETTER = /\{(?:\\(?:[`'^"~=.]|[a-zA-Z]+)\{)*(?:\\(i|j|l|L|o|O|ss|ae|AE|oe|OE)|([a-zA-Z]))\}+/g;
+
+const LETTER_COMMANDS: Record<string, string> = {
+  i: "ı", j: "ȷ", l: "ł", L: "Ł", o: "ø", O: "Ø", ss: "ß", ae: "æ", AE: "Æ", oe: "œ", OE: "Œ",
+};
+
 const entryCount = element("entry-count");
 const fileSize = element("file-size");
 const generatedAt = element<HTMLTimeElement>("generated-at");
@@ -61,7 +70,11 @@ function parseEntries(text: string): Entry[] {
         key,
         text: entryText,
         keys: [key, ...ids].map((k) => k.toLowerCase()),
-        haystack: entryText.toLowerCase(),
+        haystack: searchable(
+          entryText.replace(LATEX_LETTER, (_, command?: string, letter?: string) =>
+            command ? (LETTER_COMMANDS[command] ?? command) : (letter ?? ""),
+          ),
+        ),
       };
     });
 }
@@ -74,8 +87,13 @@ function rank(entry: Entry, query: string): number {
   return 3;
 }
 
+// Searches ignore case and accents, so "Ümit" and "umit" both find {\"{U}}mit.
+function searchable(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
 function search(query: string): Entry[] {
-  const normalized = query.trim().toLowerCase();
+  const normalized = searchable(query.trim());
   const terms = normalized.split(/\s+/);
   return entries
     .filter((entry) => terms.every((term) => entry.haystack.includes(term)))

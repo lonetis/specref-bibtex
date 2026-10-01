@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { convert, escapeLatex, formatEntry, parseDate, renderHeader } from "../src/bibtex.ts";
+import { convert, formatEntry, parseDate, renderHeader } from "../src/bibtex.ts";
 import type { SpecrefDump } from "../src/specref.ts";
 
 describe("parseDate", () => {
@@ -13,21 +13,6 @@ describe("parseDate", () => {
 
   test("ignores words that are not months", () => {
     assert.deepEqual(parseDate("Q3 2020"), { year: "2020", month: undefined });
-  });
-});
-
-describe("escapeLatex", () => {
-  test("escapes LaTeX special characters", () => {
-    assert.equal(escapeLatex("A & B_1 50% #2 $5"), "A \\& B\\_1 50\\% \\#2 \\$5");
-    assert.equal(escapeLatex("x^2 ~S \\n"), "x\\textasciicircum{}2 \\textasciitilde{}S \\textbackslash{}n");
-  });
-
-  test("keeps braces balanced", () => {
-    assert.equal(escapeLatex("T{expr"), "T\\textbraceleft{}expr");
-  });
-
-  test("decodes HTML entities and collapses whitespace", () => {
-    assert.equal(escapeLatex("  Sign &amp; Encrypt &#8211;\n done "), "Sign \\& Encrypt – done");
   });
 });
 
@@ -76,9 +61,15 @@ describe("formatEntry", () => {
     assert.match(entry, /author = \{Jane Doe and \{IAB and IESG\} and \{Tab Atkins Jr\.\} and \{Barnes, R\} and others\}/);
   });
 
+  test("writes non-ASCII letters that start a name word as commands", () => {
+    const entry = formatEntry({ id: "X", title: "Ünïcode", authors: ["Ümit Yalçinalp"] });
+    assert.ok(entry.includes('author = {{\\"{U}}mit Yalçinalp}'), entry);
+    assert.ok(entry.includes("title = {{Ünïcode}}"), entry);
+  });
+
   test("drops leftover list separators from names", () => {
-    const entry = formatEntry({ id: "X", title: "T", authors: ["Lijun Liao", "and Jörg Schwenk", "Ann Lee and", "and", "Brand Anderson"] });
-    assert.match(entry, /author = \{Lijun Liao and Jörg Schwenk and Ann Lee and Brand Anderson\}/);
+    const entry = formatEntry({ id: "X", title: "T", authors: ["Lijun Liao", "and Joerg Schwenk", "Ann Lee and", "and", "Brand Anderson"] });
+    assert.match(entry, /author = \{Lijun Liao and Joerg Schwenk and Ann Lee and Brand Anderson\}/);
   });
 
   test("labels W3C status codes", () => {
@@ -87,6 +78,17 @@ describe("formatEntry", () => {
 
   test("encodes characters that would break the url field", () => {
     assert.match(formatEntry({ id: "X", title: "T", href: "https://e.org/a b{c}" }), /url = \{https:\/\/e\.org\/a%20b%7Bc%7D\}/);
+  });
+
+  test("percent-encodes non-ASCII characters in URLs", () => {
+    assert.match(formatEntry({ id: "X", title: "T", href: "https://e.org/ü" }), /url = \{https:\/\/e\.org\/%C3%BC\}/);
+  });
+
+  test("drops authors and titles that have no LaTeX equivalent", () => {
+    const dropped: string[] = [];
+    const entry = formatEntry({ id: "X", title: "我也不知道", authors: ["Денис", "Ken Lunde 小林剣"] }, [], (char) => dropped.push(char));
+    assert.equal(entry, "@misc{X,\n  author = {Ken Lunde}\n}");
+    assert.equal(dropped.join(""), "我也不知道Денис小林剣");
   });
 });
 
@@ -98,16 +100,22 @@ describe("convert", () => {
     "a2-20200101": { id: "a2-20200101", title: "A2", versionOf: "a2" },
     ALIAS: { id: "ALIAS", aliasOf: "a2" },
     "bad key": { id: "bad key", title: "Bad" },
+    "schlüssel": { id: "schlüssel", title: "Non-ASCII" },
+    c: { id: "c", title: "C 🦄 🦄" },
   };
 
   test("emits entries and dated versions sorted by key, skipping aliases and invalid keys", () => {
     const { entries, skipped } = convert(dump);
     assert.deepEqual(
       entries.map((entry) => /^@misc\{([^,]+),/.exec(entry)?.[1]),
-      ["a2", "a2-20200101", "a10", "b"],
+      ["a2", "a2-20200101", "a10", "b", "c"],
     );
     assert.match(entries[0] ?? "", /ids = \{ALIAS\}/);
-    assert.deepEqual(skipped, ["bad key"]);
+    assert.deepEqual(skipped, ["bad key", "schlüssel"]);
+  });
+
+  test("counts characters without a LaTeX equivalent", () => {
+    assert.deepEqual(convert(dump).dropped, new Map([["🦄", 2]]));
   });
 });
 
